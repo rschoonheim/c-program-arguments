@@ -195,7 +195,7 @@ static bool validate_result(arg_result_t *result) {
 /**
  * Helper function to add positional argument
  */
-static int add_positional_arg(arg_parser_t *parser, char *arg) {
+static int add_positional_arg(arg_parser_t *parser, const char *arg) {
     if (parser->positional_count >= parser->positional_capacity) {
         size_t new_capacity = parser->positional_capacity == 0 ?
                               INITIAL_CAPACITY : parser->positional_capacity * 2;
@@ -246,7 +246,7 @@ int arg_parser_parse(arg_parser_t *parser, int argc, char **argv) {
 
         // Check if it's an option
         if (arg[0] == '-') {
-            arg_def_t *def = find_definition(parser, arg);
+            const arg_def_t *def = find_definition(parser, arg);
             if (!def) {
                 fprintf(stderr, "Unknown argument: %s\n", arg);
                 return -1;
@@ -276,7 +276,7 @@ int arg_parser_parse(arg_parser_t *parser, int argc, char **argv) {
                     return -1;
                 }
                 i++;
-                char *value = argv[i];
+                const char *value = argv[i];
 
                 switch (def->type) {
                     case ARG_TYPE_STRING:
@@ -398,7 +398,7 @@ float arg_parser_get_float(arg_parser_t *parser, const char *long_name) {
  * Check if an argument was explicitly set by the user
  */
 bool arg_parser_is_set(arg_parser_t *parser, const char *long_name) {
-    arg_result_t *result = arg_parser_get(parser, long_name);
+    const arg_result_t *result = arg_parser_get(parser, long_name);
     if (!result) {
         return false;
     }
@@ -408,7 +408,7 @@ bool arg_parser_is_set(arg_parser_t *parser, const char *long_name) {
 /**
  * Get positional arguments (non-option arguments)
  */
-char **arg_parser_get_positional(arg_parser_t *parser, size_t *count) {
+char **arg_parser_get_positional(const arg_parser_t *parser, size_t *count) {
     if (!parser || !count) {
         return NULL;
     }
@@ -428,7 +428,7 @@ void arg_parser_print_help(arg_parser_t *parser, const char *program_name) {
     printf("Options:\n");
 
     for (size_t i = 0; i < parser->definition_count; i++) {
-        arg_def_t *def = &parser->definitions[i];
+        const arg_def_t *def = &parser->definitions[i];
 
         printf("  ");
         if (def->short_name) {

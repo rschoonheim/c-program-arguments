@@ -207,7 +207,7 @@ bool arg_parser_is_set(arg_parser_t *parser, const char *long_name);
  * @param count Output parameter for the number of positional arguments
  * @return Array of positional argument strings, or NULL if none
  */
-char **arg_parser_get_positional(arg_parser_t *parser, size_t *count);
+char **arg_parser_get_positional(const arg_parser_t *parser, size_t *count);
 
 /**
  * Print usage/help message to stdout
