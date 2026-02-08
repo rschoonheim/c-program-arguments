@@ -1,0 +1,326 @@
+name: Test Program Arguments Library
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04, macos-latest]
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - os: ubuntu-20.04
+            cc: gcc
+            cxx: g++
+          - os: macos-latest
+            cc: clang
+            cxx: clang++
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential ninja-build
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install cmake ninja
+
+    - name: Display build environment
+      run: |
+        echo "OS: ${{ matrix.os }}"
+        echo "CC: ${{ matrix.cc }}"
+        cmake --version
+        ${{ matrix.cc }} --version
+
+    - name: Configure CMake
+      env:
+        CC: ${{ matrix.cc }}
+        CXX: ${{ matrix.cxx }}
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G Ninja
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Verify library exists
+      run: |
+        ls -lh build/libprogram-arguments.a
+        file build/libprogram-arguments.a
+
+    - name: Verify example binary exists
+      run: |
+        ls -lh build/example
+        file build/example
+
+    - name: Test - Display Help
+      run: |
+        echo "=== Test: Display Help ==="
+        ./build/example --help
+
+    - name: Test - Valid Arguments (All Options)
+      run: |
+        echo "=== Test: Valid Arguments (All Options) ==="
+        ./build/example -v -i input.txt -o result.txt -n 50 -t 0.75
+
+    - name: Test - Valid Arguments (Minimal)
+      run: |
+        echo "=== Test: Valid Arguments (Minimal Required) ==="
+        ./build/example -i test_input.txt
+
+    - name: Test - Valid Arguments (Long Names)
+      run: |
+        echo "=== Test: Valid Arguments (Long Names) ==="
+        ./build/example --verbose --input data.txt --output out.txt --count 25 --threshold 0.3
+
+    - name: Test - Positional Arguments
+      run: |
+        echo "=== Test: Positional Arguments ==="
+        ./build/example -i input.txt extra1 extra2 extra3
+
+    - name: Test - Default Values
+      run: |
+        echo "=== Test: Default Values ==="
+        ./build/example --input file.txt
+
+    - name: Test - Missing Required Argument (Should Fail)
+      run: |
+        echo "=== Test: Missing Required Argument ==="
+        if ./build/example 2>&1 | grep -q "Required argument missing"; then
+          echo "✓ Correctly detected missing required argument"
+          exit 0
+        else
+          echo "✗ Failed to detect missing required argument"
+          exit 1
+        fi
+
+    - name: Test - Unknown Argument (Should Fail)
+      run: |
+        echo "=== Test: Unknown Argument ==="
+        if ./build/example -i input.txt --unknown 2>&1 | grep -q "Unknown argument"; then
+          echo "✓ Correctly detected unknown argument"
+          exit 0
+        else
+          echo "✗ Failed to detect unknown argument"
+          exit 1
+        fi
+
+    - name: Test - Validation (Invalid Count - Too High)
+      run: |
+        echo "=== Test: Validation - Count Too High ==="
+        if ./build/example -i input.txt -n 150 2>&1 | grep -q "Count must be between 1 and 100"; then
+          echo "✓ Validation correctly rejected count=150"
+          exit 0
+        else
+          echo "✗ Validation failed to reject invalid count"
+          exit 1
+        fi
+
+    - name: Test - Validation (Invalid Count - Too Low)
+      run: |
+        echo "=== Test: Validation - Count Too Low ==="
+        if ./build/example -i input.txt -n 0 2>&1 | grep -q "Count must be between 1 and 100"; then
+          echo "✓ Validation correctly rejected count=0"
+          exit 0
+        else
+          echo "✗ Validation failed to reject invalid count"
+          exit 1
+        fi
+
+    - name: Test - Validation (Invalid Threshold - Too High)
+      run: |
+        echo "=== Test: Validation - Threshold Too High ==="
+        if ./build/example -i input.txt -t 1.5 2>&1 | grep -q "Threshold must be between 0.0 and 1.0"; then
+          echo "✓ Validation correctly rejected threshold=1.5"
+          exit 0
+        else
+          echo "✗ Validation failed to reject invalid threshold"
+          exit 1
+        fi
+
+    - name: Test - Validation (Invalid Threshold - Negative)
+      run: |
+        echo "=== Test: Validation - Threshold Negative ==="
+        if ./build/example -i input.txt -t -0.5 2>&1 | grep -q "Threshold must be between 0.0 and 1.0"; then
+          echo "✓ Validation correctly rejected threshold=-0.5"
+          exit 0
+        else
+          echo "✗ Validation failed to reject invalid threshold"
+          exit 1
+        fi
+
+    - name: Test - Validation (Invalid Output File Extension)
+      run: |
+        echo "=== Test: Validation - Invalid File Extension ==="
+        if ./build/example -i input.txt -o file.pdf 2>&1 | grep -q "Output file must have .txt extension"; then
+          echo "✓ Validation correctly rejected file.pdf"
+          exit 0
+        else
+          echo "✗ Validation failed to reject invalid file extension"
+          exit 1
+        fi
+
+    - name: Test - Valid Boundary Values (Count Min)
+      run: |
+        echo "=== Test: Valid Boundary - Count Min ==="
+        ./build/example -i input.txt -n 1
+
+    - name: Test - Valid Boundary Values (Count Max)
+      run: |
+        echo "=== Test: Valid Boundary - Count Max ==="
+        ./build/example -i input.txt -n 100
+
+    - name: Test - Valid Boundary Values (Threshold Min)
+      run: |
+        echo "=== Test: Valid Boundary - Threshold Min ==="
+        ./build/example -i input.txt -t 0.0
+
+    - name: Test - Valid Boundary Values (Threshold Max)
+      run: |
+        echo "=== Test: Valid Boundary - Threshold Max ==="
+        ./build/example -i input.txt -t 1.0
+
+    - name: Test - Multiple Validation Failures
+      run: |
+        echo "=== Test: Multiple Validation Failures ==="
+        OUTPUT=$(./build/example -i input.txt -n 0 -t 2.0 -o file.csv 2>&1)
+        if echo "$OUTPUT" | grep -q "Count must be between" && \
+           echo "$OUTPUT" | grep -q "Threshold must be between" && \
+           echo "$OUTPUT" | grep -q "Output file must have .txt extension"; then
+          echo "✓ All three validation errors detected"
+          exit 0
+        else
+          echo "✗ Failed to detect all validation errors"
+          echo "$OUTPUT"
+          exit 1
+        fi
+
+    - name: Test Summary
+      if: always()
+      run: |
+        echo "================================"
+        echo "Test execution completed"
+        echo "OS: ${{ matrix.os }}"
+        echo "Compiler: ${{ matrix.cc }}"
+        echo "================================"
+
+  memory-check:
+    name: Memory Leak Check with Valgrind
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential ninja-build valgrind
+
+    - name: Configure CMake (Debug)
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -G Ninja
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run Valgrind - Basic Test
+      run: |
+        valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+          --error-exitcode=1 --errors-for-leak-kinds=all \
+          ./build/example -i input.txt -o output.txt -n 50 -t 0.5
+
+    - name: Run Valgrind - With Validation Errors
+      run: |
+        valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+          --error-exitcode=1 --errors-for-leak-kinds=all \
+          ./build/example -i input.txt -n 150 -t 2.0 -o file.pdf || true
+
+    - name: Run Valgrind - Missing Required Argument
+      run: |
+        valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+          --error-exitcode=1 --errors-for-leak-kinds=all \
+          ./build/example || true
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential ninja-build cppcheck
+
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=all --suppress=missingIncludeSystem \
+          --error-exitcode=1 --inline-suppr \
+          --std=c11 -I includes src/*.c example/*.c
+
+  code-coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential ninja-build gcovr lcov
+
+    - name: Configure CMake with Coverage
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-arcs" \
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage" \
+          -G Ninja
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run tests for coverage
+      run: |
+        ./build/example --help || true
+        ./build/example -i input.txt || true
+        ./build/example -i input.txt -o out.txt -n 50 -t 0.5 -v || true
+        ./build/example -i input.txt -n 150 || true
+        ./build/example -i input.txt -t 2.0 || true
+        ./build/example -i input.txt -o file.pdf || true
+        ./build/example || true
+        ./build/example --unknown || true
+
+    - name: Generate coverage report
+      run: |
+        gcovr --root . --print-summary --xml-pretty --xml coverage.xml \
+          build/CMakeFiles/program-arguments.dir/src/ || true
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+      continue-on-error: true
+

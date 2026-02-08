@@ -1,5 +1,8 @@
 # Program Arguments Library
 
+![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 A type-safe command-line argument parser for C programs.
 
 ## Features
