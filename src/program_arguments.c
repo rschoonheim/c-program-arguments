@@ -242,7 +242,7 @@ int arg_parser_parse(arg_parser_t *parser, int argc, char **argv) {
 
     // Parse arguments
     for (int i = 1; i < argc; i++) {
-        char *arg = argv[i];
+        const char *arg = argv[i];
 
         // Check if it's an option
         if (arg[0] == '-') {
