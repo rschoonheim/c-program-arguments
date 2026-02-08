@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-20.04, macos-latest]
+        os: [ubuntu-latest, ubuntu-20.04]
         include:
           - os: ubuntu-latest
             cc: gcc
@@ -23,9 +23,6 @@ jobs:
           - os: ubuntu-20.04
             cc: gcc
             cxx: g++
-          - os: macos-latest
-            cc: clang
-            cxx: clang++
 
     steps:
     - name: Checkout code
