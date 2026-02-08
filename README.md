@@ -13,6 +13,8 @@ A type-safe command-line argument parser for C programs.
 - Short and long argument names (`-v` / `--verbose`)
 - Required and optional arguments
 - Default values
+- **Argument validation with custom validators**
+- Validation caching (runs once per argument access)
 - Positional arguments
 - Automatic help message generation
 - Memory-safe with proper cleanup
@@ -101,6 +103,47 @@ int arg_parser_add_float(arg_parser_t *parser,
                         bool required,
                         float default_value);
 ```
+
+#### Setting Validators
+
+```c
+// Validator function type
+typedef bool (*arg_validator_fn)(arg_value_t value, arg_type_t type, 
+                                  char *error_msg, size_t error_msg_size);
+
+// Set a validator for an argument
+int arg_parser_set_validator(arg_parser_t *parser,
+                             const char *long_name,
+                             arg_validator_fn validator);
+```
+
+**Example validator:**
+
+```c
+// Validate that a number is in range
+bool validate_count(arg_value_t value, arg_type_t type, 
+                   char *error_msg, size_t error_msg_size) {
+    if (type != ARG_TYPE_INT) {
+        return false;
+    }
+    
+    if (value.integer < 1 || value.integer > 100) {
+        snprintf(error_msg, error_msg_size, 
+                "Count must be between 1 and 100, got %d", value.integer);
+        return false;
+    }
+    return true;
+}
+
+// Set the validator
+arg_parser_set_validator(parser, "--count", validate_count);
+```
+
+**Validation behavior:**
+- Validators run once when the argument is first accessed
+- Results are cached for subsequent accesses
+- Invalid arguments return default values
+- Error messages are printed to stderr
 
 #### Parsing
 

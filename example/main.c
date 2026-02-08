@@ -2,6 +2,49 @@
 #include <stdio.h>
 #include <string.h>
 
+// Validation function for count (must be between 1 and 100)
+bool validate_count(arg_value_t value, arg_type_t type, char *error_msg, size_t error_msg_size) {
+    if (type != ARG_TYPE_INT) {
+        return false;
+    }
+
+    if (value.integer < 1 || value.integer > 100) {
+        snprintf(error_msg, error_msg_size,
+                "Count must be between 1 and 100, got %d", value.integer);
+        return false;
+    }
+    return true;
+}
+
+// Validation function for threshold (must be between 0.0 and 1.0)
+bool validate_threshold(arg_value_t value, arg_type_t type, char *error_msg, size_t error_msg_size) {
+    if (type != ARG_TYPE_FLOAT) {
+        return false;
+    }
+
+    if (value.floating < 0.0f || value.floating > 1.0f) {
+        snprintf(error_msg, error_msg_size,
+                "Threshold must be between 0.0 and 1.0, got %.2f", value.floating);
+        return false;
+    }
+    return true;
+}
+
+// Validation function for output file (must end with .txt)
+bool validate_output_file(arg_value_t value, arg_type_t type, char *error_msg, size_t error_msg_size) {
+    if (type != ARG_TYPE_STRING || !value.string) {
+        return false;
+    }
+
+    size_t len = strlen(value.string);
+    if (len < 4 || strcmp(value.string + len - 4, ".txt") != 0) {
+        snprintf(error_msg, error_msg_size,
+                "Output file must have .txt extension, got '%s'", value.string);
+        return false;
+    }
+    return true;
+}
+
 int main(int argc, char *argv[]) {
     // Create argument parser
     arg_parser_t *parser = arg_parser_create();
@@ -28,6 +71,11 @@ int main(int argc, char *argv[]) {
 
     arg_parser_add_float(parser, "-t", "--threshold",
                         "Threshold value", false, 0.5f);
+
+    // Set up validators for arguments
+    arg_parser_set_validator(parser, "--count", validate_count);
+    arg_parser_set_validator(parser, "--threshold", validate_threshold);
+    arg_parser_set_validator(parser, "--output", validate_output_file);
 
     // Check for help flag first (before parsing errors)
     for (int i = 1; i < argc; i++) {

@@ -68,6 +68,7 @@ static int add_argument(arg_parser_t *parser, const char *short_name,
     def->type = type;
     def->required = required;
     def->default_value = default_value;
+    def->validator = NULL;
 
     parser->definition_count++;
     return 0;
@@ -122,6 +123,25 @@ int arg_parser_add_float(arg_parser_t *parser, const char *short_name,
 }
 
 /**
+ * Set validator for an argument
+ */
+int arg_parser_set_validator(arg_parser_t *parser, const char *long_name,
+                             arg_validator_fn validator) {
+    if (!parser || !long_name) {
+        return -1;
+    }
+
+    for (size_t i = 0; i < parser->definition_count; i++) {
+        if (parser->definitions[i].long_name &&
+            strcmp(parser->definitions[i].long_name, long_name) == 0) {
+            parser->definitions[i].validator = validator;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+/**
  * Helper function to find argument definition by name
  */
 static arg_def_t *find_definition(arg_parser_t *parser, const char *name) {
@@ -132,6 +152,44 @@ static arg_def_t *find_definition(arg_parser_t *parser, const char *name) {
         }
     }
     return NULL;
+}
+
+/**
+ * Helper function to validate a result (runs once)
+ */
+static bool validate_result(arg_result_t *result) {
+    if (!result) {
+        return false;
+    }
+
+    // If validation already attempted, return cached result
+    if (result->validation_attempted) {
+        return result->is_valid;
+    }
+
+    result->validation_attempted = true;
+
+    // If no validator is set, consider it valid
+    if (!result->definition->validator) {
+        result->is_valid = true;
+        return true;
+    }
+
+    // Run the validator
+    result->is_valid = result->definition->validator(
+        result->value,
+        result->definition->type,
+        result->validation_error,
+        sizeof(result->validation_error)
+    );
+
+    // If validation failed, print error
+    if (!result->is_valid && result->validation_error[0] != '\0') {
+        fprintf(stderr, "Validation error for %s: %s\n",
+                result->definition->long_name, result->validation_error);
+    }
+
+    return result->is_valid;
 }
 
 /**
@@ -177,6 +235,9 @@ int arg_parser_parse(arg_parser_t *parser, int argc, char **argv) {
         parser->results[i].definition = &parser->definitions[i];
         parser->results[i].value = parser->definitions[i].default_value;
         parser->results[i].is_set = false;
+        parser->results[i].validation_attempted = false;
+        parser->results[i].is_valid = false;
+        parser->results[i].validation_error[0] = '\0';
     }
 
     // Parse arguments
@@ -266,7 +327,14 @@ arg_result_t *arg_parser_get(arg_parser_t *parser, const char *long_name) {
     for (size_t i = 0; i < parser->definition_count; i++) {
         if (parser->definitions[i].long_name &&
             strcmp(parser->definitions[i].long_name, long_name) == 0) {
-            return &parser->results[i];
+            arg_result_t *result = &parser->results[i];
+
+            // Run validation if not already done
+            if (!validate_result(result)) {
+                return NULL;
+            }
+
+            return result;
         }
     }
     return NULL;
@@ -300,6 +368,11 @@ const char *arg_parser_get_string(arg_parser_t *parser, const char *long_name) {
 int arg_parser_get_int(arg_parser_t *parser, const char *long_name) {
     arg_result_t *result = arg_parser_get(parser, long_name);
     if (!result || result->definition->type != ARG_TYPE_INT) {
+        // Return default value on validation failure
+        arg_def_t *def = find_definition(parser, long_name);
+        if (def && def->type == ARG_TYPE_INT) {
+            return def->default_value.integer;
+        }
         return 0;
     }
     return result->value.integer;
@@ -311,6 +384,11 @@ int arg_parser_get_int(arg_parser_t *parser, const char *long_name) {
 float arg_parser_get_float(arg_parser_t *parser, const char *long_name) {
     arg_result_t *result = arg_parser_get(parser, long_name);
     if (!result || result->definition->type != ARG_TYPE_FLOAT) {
+        // Return default value on validation failure
+        arg_def_t *def = find_definition(parser, long_name);
+        if (def && def->type == ARG_TYPE_FLOAT) {
+            return def->default_value.floating;
+        }
         return 0.0f;
     }
     return result->value.floating;

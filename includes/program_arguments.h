@@ -25,6 +25,17 @@ typedef union {
 } arg_value_t;
 
 /**
+ * Validation function pointer type
+ * @param value The value to validate
+ * @param type The type of the argument
+ * @param error_msg Buffer to store error message (can be NULL)
+ * @param error_msg_size Size of error message buffer
+ * @return true if valid, false otherwise
+ */
+typedef bool (*arg_validator_fn)(arg_value_t value, arg_type_t type,
+                                  char *error_msg, size_t error_msg_size);
+
+/**
  * Argument definition structure
  */
 typedef struct arg_def {
@@ -34,6 +45,7 @@ typedef struct arg_def {
     arg_type_t type;         // Argument type
     bool required;           // Whether argument is required
     arg_value_t default_value; // Default value if not provided
+    arg_validator_fn validator; // Optional validation function
 } arg_def_t;
 
 /**
@@ -43,6 +55,9 @@ typedef struct {
     const arg_def_t *definition;
     arg_value_t value;
     bool is_set;
+    bool validation_attempted;
+    bool is_valid;
+    char validation_error[256];
 } arg_result_t;
 
 /**
@@ -118,6 +133,16 @@ int arg_parser_add_int(arg_parser_t *parser, const char *short_name,
 int arg_parser_add_float(arg_parser_t *parser, const char *short_name,
                          const char *long_name, const char *description,
                          bool required, float default_value);
+
+/**
+ * Set validator for an argument
+ * @param parser The parser instance
+ * @param long_name The long name of the argument
+ * @param validator The validation function
+ * @return 0 on success, -1 on error
+ */
+int arg_parser_set_validator(arg_parser_t *parser, const char *long_name,
+                             arg_validator_fn validator);
 
 /**
  * Parse command line arguments
